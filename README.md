@@ -21,5 +21,5 @@ will split a video into chunks of size 100, with I-frames every 25 frames.
 Note that audio information is not preserved.
 
 
-Based on ffmpeg sample code (muxing.c)[https://www.ffmpeg.org/doxygen/2.7/muxing_8c-example.html]
-and code from dranger's ("An ffmpeg and SDL tutorial")[http://dranger.com/ffmpeg/].
+Partially based on [ffmpeg sample code](https://www.ffmpeg.org/doxygen/2.7/examples.html).
+
