@@ -1,7 +1,7 @@
 split_video
 ===========
 
-Split a video into even sized chunks.
+Split and recode an mp4 video into evenly sized chunks.
 
 Usage:
 
@@ -18,8 +18,43 @@ Example:
 
 will split a video into chunks of size 100, with I-frames every 25 frames.
 
-Note that audio information is not preserved.
+Notes
+=====
+ffmpeg itself has been adding functionality for chunking video in recent versions.
 
+For an input file at 25 fps, the following command almost produces 120 frame chunks:
 
-Partially based on [ffmpeg sample code](https://www.ffmpeg.org/doxygen/2.7/examples.html).
+    ffmpeg -i input.mp4 -f segment -segment_time 4.8 \
+        -segment_format_options movflags=+faststart \
+        -force_key_frames '"expr:eq(mod(n,30),0)"' \
+        -vcodec h264 -pix_fmt yuv420p \
+        -crf 18 \
+        -flags +global_header \
+        chunks/%05d.mp4
+
+However, I found that occasionally, 119 or 121 frame chunks would be produced, and
+for my needs, I wanted all chunks to be exactly 120 frames.  So I wrote this tool.
+
+Caveats
+=======
+1. audio information is not preserved
+2. only tested on mp4 files, and makes some mp4 specific assumptions
+3. assumes fixed frame rate encoding
+4. only outputs I and P frames (no B frames)
+
+The code could also use some cleanup, but it works for my use case.
+
+Future Work
+===========
+I have no plans to extend this right now, but I'll gladly accept pull requests
+which update the code.  Possible extensions
+
+* include audio
+* generalize to other video codecs, variable rate encoding
+* for mp4, output B frames
+
+Sources
+=======
+Based on [ffmpeg sample code](https://www.ffmpeg.org/doxygen/2.7/examples.html).
+(License is copied from there.)
 
