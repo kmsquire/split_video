@@ -558,11 +558,14 @@ static void split_video(const char *infilename,
 
     // Skip input frames
 
+    if (skip > 0)
+        fprintf(stderr, "Skipping %d frames\n", skip);
+
     while (skip > 0) {
         // TODO: I'd rather not decode the frames, but this will take some work to
         //       refactor
         if (!read_frame(dc)) {
-            fprintf(stderr, "No frame available, skip = %d", skip);
+            fprintf(stderr, "No more frames available, skip = %d\n", skip);
             exit(0);
         }
         --skip;
