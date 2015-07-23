@@ -5,7 +5,8 @@ Split and recode an mp4 video into evenly sized chunks.
 
 Usage:
 
-    ./split_video [--gop-size 30] [--chunk-size 120] input_file output_template
+    ./split_video [--gop-size 30] [--chunk-size 120] [--skip 123]
+                  [--length 1200] input_file output_template
 
 where
 
@@ -59,5 +60,5 @@ which update the code.  Possible extensions
 Sources
 =======
 Based on [ffmpeg sample code](https://www.ffmpeg.org/doxygen/2.7/examples.html).
-(License is copied from there.)
+BSD-style license (see License.txt).
 
