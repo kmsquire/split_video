@@ -167,7 +167,6 @@ static DecoderContext *init_decoder(const char *filename)
     return dc;
 }
 
-
 AVFrame *read_frame(DecoderContext *dc)
 {
     int len, got_frame;
@@ -511,10 +510,6 @@ static void close_encoder(EncoderContext *ec)
     
     close_stream(ec->oc, &(ec->video_st));
     avio_closep(&(ec->oc->pb));
-    
-    /* add sequence end code to have a real mpeg file */
-    /* fwrite(ec->endcode, 1, sizeof(ec->endcode), ec->f);*/
-
 }
 
 static void set_pict_type(AVFrame *frame, int gop_size, int frame_count) {
@@ -529,6 +524,8 @@ static void split_video(const char *infilename,
                         const char *outfmt,
                         int gop_size,
                         int chunk_size,
+                        int skip,
+                        long long length,
                         AVDictionary *_opt)
 {
     DecoderContext *dc;
@@ -554,13 +551,26 @@ static void split_video(const char *infilename,
     framerate = dc->codecCtx->framerate;
     pix_fmt = dc->codecCtx->pix_fmt;
 
+    // Skip input frames
+
+    while (skip > 0) {
+        // TODO: I'd rather not decode the frames, but this will take some work to
+        //       refactor
+        if (!read_frame(dc)) {
+            fprintf(stderr, "No frame available, skip = %d", skip);
+            exit(0);
+        }
+        --skip;
+    }
+
+    // Initialize output
     fprintf(stderr, "\rWriting chunk %05d", chunk_count);
     fflush(stderr);
 
     snprintf(outfilename, MAX_FILENAME_LEN, outfmt, chunk_count++);
     ec = init_encoder(outfilename, gop_size, width, height, framerate, pix_fmt, opt);
     
-    for (;;) {
+    while (length <= 0 || frame_count < length) {
         frame = read_frame(dc);
         if (!frame)
             break;
@@ -591,18 +601,22 @@ static void split_video(const char *infilename,
     fprintf(stderr, "  for a total of %lld frames\n", (chunk_count-1) * chunk_size + out_frame_num);
 }
 
-void help(const char * prog_name) {
+void print_help(const char * prog_name) {
     printf("\n"
            "    Split a video into even sized chunks.\n"
            "\n"
            "    Usage:\n"
            "\n"
-           "        %s [--gop-size 30] [--chunk-size 120] input_file output_template\n"
+           "        %s [--gop-size 30] [--chunk-size 120] [--skip 123]\n"
+           "                  [--length 1200] input_file output_template\n"
            "\n"
            "    where\n"
            "\n"
            "        --gop-size   is the size of a group of pictures\n"
            "        --chunk-size is the size of a chunk in frames\n"
+           "        --skip       are the number of frames to skip at the\n"
+           "                     beginning of the input file\n"
+           "        --length     are the number of frames to encode\n"
            "\n"
            "    Example:\n"
            "\n"
@@ -621,7 +635,10 @@ int main(int argc, char **argv)
     AVDictionary *opt = NULL;
     int gop_size = 30;
     int chunk_size = 120;
+    int skip = 0;
+    long long length = -1;
     int c;
+    static int help = 0;
     char *end;
 
     while(1)
@@ -631,12 +648,15 @@ int main(int argc, char **argv)
           /* These options set a flag. */
           {"gop-size",  required_argument, 0, 'g'},
           {"chunk-size",  required_argument, 0, 'c'},
+          {"skip", required_argument, 0, 's'},
+          {"length", required_argument, 0, 'n'},
+          {"help", no_argument, &help, 'h'},
           {0, 0, 0, 0}
         };
       /* getopt_long stores the option index here. */
       int option_index = 0;
 
-      c = getopt_long (argc, argv, "g:c:h",
+      c = getopt_long (argc, argv, "g:c:s:n:h",
                        long_options, &option_index);
 
       /* Detect the end of the options. */
@@ -653,8 +673,16 @@ int main(int argc, char **argv)
             chunk_size = (int)strtoul(optarg, &end, 10);
             break;
 
+        case 's':
+            skip = (int)strtoul(optarg, &end, 10);
+            break;
+
+        case 'n':
+            length = strtoul(optarg, &end, 10);
+            break;
+
         case 'h':
-            help(argv[0]);
+            print_help(argv[0]);
             exit(0);
             break;
             
@@ -673,7 +701,7 @@ int main(int argc, char **argv)
     }
     
     if (argc - optind != 2) {
-        help(argv[0]);
+        print_help(argv[0]);
         return 1;
     }
 
@@ -691,7 +719,7 @@ int main(int argc, char **argv)
     avcodec_register_all();
     av_log_set_level(AV_LOG_WARNING);
 
-    split_video(input_file, output_template, gop_size, chunk_size, opt);
+    split_video(input_file, output_template, gop_size, chunk_size, skip, length, opt);
 
     return 0;
 }

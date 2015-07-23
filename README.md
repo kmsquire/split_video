@@ -11,6 +11,9 @@ where
 
     --gop-size   is the size of a group of pictures
     --chunk-size is the size of a chunk in frames
+    --skip       are the number of frames to skip at the
+                 beginning of the input file
+    --length     are the number of frames to encode
 
 Example:
 
