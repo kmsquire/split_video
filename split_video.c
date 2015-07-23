@@ -169,15 +169,20 @@ static DecoderContext *init_decoder(const char *filename)
 
 AVFrame *read_frame(DecoderContext *dc)
 {
-    int len, got_frame;
+    int ret, got_frame;
 
     got_frame = 0;
     while (av_read_frame(dc->formatCtx, &(dc->avpkt)) == 0) {
-        if (dc->avpkt.stream_index == dc->videoStream)
-            len = avcodec_decode_video2(dc->codecCtx, dc->frame, &got_frame, &(dc->avpkt));
+        if (dc->avpkt.stream_index == dc->videoStream) {
+            ret = avcodec_decode_video2(dc->codecCtx, dc->frame, &got_frame, &(dc->avpkt));
+            if (ret < 0) {
+                fprintf(stderr, "unable to decode video frame...\n");
+                exit(1);
+            }
+        }
 
         av_free_packet(&(dc->avpkt));
-        
+
         if (got_frame)
             break;
     }
@@ -270,10 +275,10 @@ static void add_stream(OutputStream *ost, AVFormatContext *oc,
         c->time_base       = ost->st->time_base;
         c->gop_size      = gop_size;
         c->pix_fmt       = pix_fmt;
-        
+
         if (c->codec_id == AV_CODEC_ID_H264)
             av_opt_set(c->priv_data, "preset", "slow", 0);
-        
+
         break;
     default:
         break;
@@ -359,7 +364,7 @@ static EncoderContext *init_encoder(const char *filename, int gop_size, int widt
     int ret;
     AVDictionary *opt = NULL;
     av_dict_copy(&opt, _opt, 0);
-    
+
     /* Allocate output context */
     avformat_alloc_output_context2(&(ec->oc), NULL, NULL, filename);
     if (!(ec->oc)) {
@@ -405,11 +410,11 @@ static EncoderContext *init_encoder(const char *filename, int gop_size, int widt
     ec->endcode[1] = 0;
     ec->endcode[2] = 1;
     ec->endcode[3] = 0xb7;
-    
+
     av_init_packet(&(ec->pkt));
     ec->pkt.data = NULL;    // packet data will be allocated by the encoder
     ec->pkt.size = 0;
-    
+
     ec->frame_count = 0;
     ec->got_output = 0;
 
@@ -478,7 +483,7 @@ static void flush_frames(EncoderContext *ec)
     AVFormatContext *oc = ec->oc;
     AVCodecContext *c;
     c = ost->st->codec;
-    
+
     /* get the delayed frames */
     while (1) {
         ret = avcodec_encode_video2(c, &(ec->pkt), NULL, &(ec->got_output));
@@ -507,7 +512,7 @@ static void close_encoder(EncoderContext *ec)
     flush_frames(ec);
 
     av_write_trailer(ec->oc);
-    
+
     close_stream(ec->oc, &(ec->video_st));
     avio_closep(&(ec->oc->pb));
 }
@@ -530,7 +535,7 @@ static void split_video(const char *infilename,
 {
     DecoderContext *dc;
     EncoderContext *ec;
-    
+
     AVFrame *frame;
     int width, height;
     long long frame_count = 0, out_frame_num = 0;
@@ -539,7 +544,7 @@ static void split_video(const char *infilename,
     AVDictionary *opt = NULL;
     AVRational framerate;
     enum AVPixelFormat pix_fmt;
-    
+
     av_dict_copy(&opt, _opt, 0);
 
     // Initialize the decoder
@@ -569,7 +574,7 @@ static void split_video(const char *infilename,
 
     snprintf(outfilename, MAX_FILENAME_LEN, outfmt, chunk_count++);
     ec = init_encoder(outfilename, gop_size, width, height, framerate, pix_fmt, opt);
-    
+
     while (length <= 0 || frame_count < length) {
         frame = read_frame(dc);
         if (!frame)
@@ -592,7 +597,7 @@ static void split_video(const char *infilename,
 
         write_video_frame(ec, frame);
     }
-    
+
     close_encoder(ec);
     close_decoder(dc);
 
@@ -685,7 +690,7 @@ int main(int argc, char **argv)
             print_help(argv[0]);
             exit(0);
             break;
-            
+
         case '?':
             break;
 
@@ -699,7 +704,7 @@ int main(int argc, char **argv)
                 chunk_size, gop_size);
         return 1;
     }
-    
+
     if (argc - optind != 2) {
         print_help(argv[0]);
         return 1;
@@ -710,7 +715,7 @@ int main(int argc, char **argv)
 
     printf("GOP size: %d\n", gop_size);
     printf("Chunk size: %d\n", chunk_size);
-    
+
     av_dict_set(&opt, "crf", "18", 0);
     av_dict_set(&opt, "movflags", "faststart", 0);
 
